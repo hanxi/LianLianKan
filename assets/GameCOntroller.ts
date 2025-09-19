@@ -16,15 +16,24 @@ export class GameController extends Component {
     @property(Label)
     public statusLabel: Label = null;
 
+    @property(Label)
+    public scoreLabel: Label = null; // 新增：分数显示
+
+    @property(Label)
+    public timeLabel: Label = null;
+
     @property(Graphics)
     public lineRenderer: Graphics = null;
 
     private rows = 8;
     private cols = 8;
-    private gridSize = 80;
+    private gridSize = 70;
     private board: number[][] = [];
     private selected: Array<Point> = [];
-    
+    private score = 0; // 当前分数
+    private timeElapsed = 0;     // 已用时间（秒）
+    private timerInterval = null; // 定时器句柄
+
     // 存储每个格子的高亮 Graphics 边框
     private highlightGraphics: { [key: string]: Graphics } = {};
 
@@ -33,6 +42,8 @@ export class GameController extends Component {
         this.generateGrids();
         this.renderBoard();
         this.updateStatus('点击一个图标，再选择另一个相同图标进行连接');
+        this.updateScore(0);
+        this.startTime(); // 开始计时
     }
 
     private initBoard() {
@@ -164,7 +175,7 @@ export class GameController extends Component {
             this.selected.push({ row, col });
             this.addHighlightBorder(row, col);
             this.updateStatus('选择第二个相同图标');
-        } 
+        }
         else if (this.selected.length === 1) {
             const a = this.selected[0];
 
@@ -180,6 +191,7 @@ export class GameController extends Component {
 
             if (this.board[a.row][a.col] !== this.board[row][col]) {
                 this.showError('❌ 不是相同的图标！');
+                this.updateScore(this.score - 1); // 🔽 选错扣1分
                 this.delayClearSelection();
                 return;
             }
@@ -193,6 +205,7 @@ export class GameController extends Component {
                 }, 0.4);
             } else {
                 this.showError('🚫 路径被阻挡或拐点过多！');
+                this.updateScore(this.score - 1); // 🔽 无法连接也扣1分
                 this.delayClearSelection();
             }
         }
@@ -302,6 +315,9 @@ export class GameController extends Component {
         this.board[r1][c1] = -1;
         this.board[r2][c2] = -1;
 
+        // ✅ 加分！每消除一对 +10 分
+        this.updateScore(this.score + 10);
+
         const n1 = this.gameBoard.getChildByName(`tile_${r1}_${c1}`);
         const n2 = this.gameBoard.getChildByName(`tile_${r2}_${c2}`);
 
@@ -310,7 +326,9 @@ export class GameController extends Component {
             .call(() => {
                 this.renderBoard();
                 if (this.checkWin()) {
+                    this.stopTime(); // 停止计时
                     this.updateStatus('🎉 恭喜通关！');
+                    this.updateScore(this.score + 50); // 通关 bonus
                 } else {
                     this.updateStatus('继续消除吧！');
                 }
@@ -353,4 +371,37 @@ export class GameController extends Component {
             [arr[i], arr[j]] = [arr[j], arr[i]];
         }
     }
+
+    // 更新分数显示
+    private updateScore(score: number) {
+        this.score = score;
+        if (this.scoreLabel) {
+            this.scoreLabel.string = `分数：${this.score}`;
+        }
+    }
+
+    private updateTime() {
+        this.timeElapsed++;
+        if (this.timeLabel) {
+            this.timeLabel.string = `时间：${this.timeElapsed}s`;
+        }
+    }
+
+    // 开始计时
+    private startTime() {
+        this.timeElapsed = 0;
+        this.updateTime();
+        this.timerInterval = setInterval(() => {
+            this.updateTime();
+        }, 1000);
+    }
+
+    // 停止计时
+    private stopTime() {
+        if (this.timerInterval) {
+            clearInterval(this.timerInterval);
+            this.timerInterval = null;
+        }
+    }
+
 }
